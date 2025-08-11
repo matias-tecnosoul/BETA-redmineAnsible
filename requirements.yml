@@ -1,7 +1,11 @@
 ---
+# Collections (van antes que roles)
+collections:
+  - name: grafana.grafana
+    version: ">=2.0.0"
+
+# Roles tradicionales
 roles:
   - name: cimon-io.asdf
   - name: geerlingguy.mysql
   - name: geerlingguy.nginx
-  - name: grafana.grafana.opentelemetry_collector
-    version: ">=0.1.0"

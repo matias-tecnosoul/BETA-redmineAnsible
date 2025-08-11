@@ -1,4 +1,4 @@
-# Usuarios y rutas
+# Usuarios y rutas (mantener como está)
 redmine_user: redmine
 redmine_group: redmine
 vagrant_user: vagrant
@@ -6,12 +6,8 @@ vagrant_home: /home/vagrant
 redmine_version: 6.0.5
 redmine_root: /opt/redmine
 
-# Base de datos
-#mysql_service_enabled: false
-#mysql_service_state: started
-
+# Base de datos (mantener como está)
 mysql_root_password: "rootpass123"
-
 mysql_user: "redmine"
 mysql_password: "redmine123"
 mysql_server: "localhost"
@@ -27,8 +23,8 @@ mysql_users:
     password: redmine123
     priv: "redmine.*:ALL"
 
-# asdf
-asdf_user: root
+# asdf (mantener como está)
+asdf_user: redmine
 asdf_group: redmine
 asdf_dir: /home/redmine/.asdf
 asdf_plugins:
@@ -37,8 +33,12 @@ asdf_plugins:
     global: "3.2.0"
 asdf_legacy_version_file: "yes"
 
-# OpenTelemetry Collector Configuration
-opentelemetry_collector_config:
+# OpenTelemetry Collector - Configuración YAML cruda (como espera el role)
+otel_collector_version: "0.113.0"
+otel_collector_type: "contrib"
+
+# IMPORTANTE: El role espera YAML como string, no como diccionario
+otel_collector_config: |
   receivers:
     otlp:
       protocols:
@@ -46,87 +46,28 @@ opentelemetry_collector_config:
           endpoint: 0.0.0.0:4317
         http:
           endpoint: 0.0.0.0:4318
-    
-    # Métricas del host (opcional pero recomendado)
-    hostmetrics:
-      collection_interval: 30s
-      scrapers:
-        cpu:
-        disk:
-        memory:
-        network:
-        process:
-
+  
   processors:
     batch:
-      timeout: 10s
-      send_batch_size: 1024
-    
-    # Detectar información del host
-    resourcedetection:
-      detectors: [env, system]
-      timeout: 5s
-    
-    # Enriquecer con información del servicio
-    resource:
-      attributes:
-        - key: deployment.environment
-          value: "{{ ansible_hostname }}"
-          action: upsert
-        - key: host.name
-          value: "{{ ansible_hostname }}"
-          action: upsert
-
+  
   exporters:
-    # Exporter principal a Grafana Cloud
     otlphttp:
       endpoint: "{{ grafana_cloud_otlp_endpoint }}"
       headers:
         Authorization: "Basic {{ grafana_cloud_otlp_token }}"
-    
-    # Exporter para debugging local (opcional)
-    logging:
-      loglevel: debug
-
-  extensions:
-    health_check:
-      endpoint: 0.0.0.0:13133
-    pprof:
-      endpoint: 0.0.0.0:1777
-    zpages:
-      endpoint: 0.0.0.0:55679
-
+  
   service:
-    extensions: [health_check, pprof, zpages]
     pipelines:
       traces:
         receivers: [otlp]
-        processors: [resourcedetection, resource, batch]
+        processors: [batch]
         exporters: [otlphttp]
-      
       metrics:
-        receivers: [otlp, hostmetrics]
-        processors: [resourcedetection, resource, batch]
-        exporters: [otlphttp]
-      
-      logs:
         receivers: [otlp]
-        processors: [resourcedetection, resource, batch]
+        processors: [batch]
         exporters: [otlphttp]
 
-# Configuración específica de Grafana Cloud
-# NOTA: Crear vars.local.yml para estos valores sensibles
-grafana_cloud_otlp_endpoint: "{{ vault_grafana_cloud_otlp_endpoint }}"
-grafana_cloud_otlp_token: "{{ vault_grafana_cloud_otlp_token }}"
-
-# Configuración de OpenTelemetry para Redmine
-redmine_otel_config:
-  service_name: "redmine"
-  service_version: "{{ redmine_version }}"
-  collector_endpoint: "http://127.0.0.1:4318"  # HTTP endpoint del collector local
-
-# geerlingguy.nginx
-
+# nginx (mantener configuración existente)
 nginx_remove_default_vhost: true
 
 nginx_vhosts:
@@ -135,26 +76,9 @@ nginx_vhosts:
     root: "/opt/redmine/public"
     index: "index.html index.htm"
     extra_parameters: |
-      # Logs estructurados para observabilidad
-      log_format json_combined escape=json
-      '{'
-          '"time":"$time_iso8601",'
-          '"remote_addr":"$remote_addr",'
-          '"request":"$request",'
-          '"status":$status,'
-          '"body_bytes_sent":$body_bytes_sent,'
-          '"request_time":$request_time,'
-          '"upstream_response_time":"$upstream_response_time",'
-          '"http_user_agent":"$http_user_agent",'
-          '"trace_id":"$http_x_trace_id"'
-      '}';
-      
-      access_log /var/log/nginx/redmine_access.log json_combined;
-      
       location /assets/ {
           expires max;
           access_log off;
-          add_header X-Trace-Id $http_x_trace_id always;
       }
       
       location / {
@@ -163,9 +87,4 @@ nginx_vhosts:
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto $scheme;
-          
-          # Preservar headers de tracing
-          proxy_set_header X-Trace-Id $http_x_trace_id;
-          proxy_set_header traceparent $http_traceparent;
-          proxy_set_header tracestate $http_tracestate;
       }

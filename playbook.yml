@@ -28,6 +28,7 @@
         name: geerlingguy.mysql
 
     # Instalar OpenTelemetry Collector ANTES de Redmine
+    # NOTA: Usar el FQCN (Fully Qualified Collection Name)
     - name: Instalar OpenTelemetry Collector
       ansible.builtin.include_role:
         name: grafana.grafana.opentelemetry_collector
