@@ -45,12 +45,22 @@
 #    group: "{{ redmine_group }}"
 #    mode: '0644'
 
-- name: Añadir gemas adicionales al Gemfile.local
+- name: Añadir gemas de OpenTelemetry al Gemfile.local
   ansible.builtin.copy:
     dest: "{{ redmine_root }}/Gemfile.local"
     content: |
       gem 'puma'
-      gem 'tzinfo-data' # esto por docker
+      gem 'tzinfo-data'
+      
+      # OpenTelemetry instrumentation
+      gem 'opentelemetry-sdk'
+      gem 'opentelemetry-exporter-otlp'
+      gem 'opentelemetry-instrumentation-all'
+      gem 'opentelemetry-instrumentation-rails'
+      gem 'opentelemetry-instrumentation-active_record'
+      gem 'opentelemetry-instrumentation-rack'
+      gem 'opentelemetry-instrumentation-net_http'
+      gem 'opentelemetry-semantic_conventions'
     owner: "{{ redmine_user }}"
     group: "{{ redmine_group }}"
     mode: '0644'
@@ -63,6 +73,22 @@
     group: "{{ redmine_group }}"
     mode: '0640'
 
+- name: Crear configuración de OpenTelemetry para Redmine
+  ansible.builtin.template:
+    src: opentelemetry.rb.j2
+    dest: "{{ redmine_root }}/config/initializers/opentelemetry.rb"
+    owner: "{{ redmine_user }}"
+    group: "{{ redmine_group }}"
+    mode: '0644'
+
+- name: Crear archivo de variables de entorno para OpenTelemetry
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ redmine_root }}/.env"
+    owner: "{{ redmine_user }}"
+    group: "{{ redmine_group }}"
+    mode: '0640'
+    
 # Quizas sea mala practica agrupar tanto, pero sino tenia problemas..
 - name: Instalar dependencias y configurar Redmine
   become: true

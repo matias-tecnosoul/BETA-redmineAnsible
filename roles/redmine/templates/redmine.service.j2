@@ -1,12 +1,14 @@
 [Unit]
 Description=Puma HTTP Server for Redmine
-After=network.target
+After=network.target otel-collector.service
+Wants=otel-collector.service
 
 [Service]
 User=redmine
 Group=redmine
-WorkingDirectory=/opt/redmine
+WorkingDirectory={{ redmine_root }}
 Environment=RAILS_ENV=production
+EnvironmentFile={{ redmine_root }}/.env
 ExecStart=/bin/bash -lc 'bundle exec rails server -e production -b 0.0.0.0 -p 3001'
 Restart=always
 RestartSec=5

@@ -1,9 +1,10 @@
-- name: Desplegar infraestructura completa
+- name: Desplegar infraestructura completa con observabilidad
   hosts: all
   become: true
 
   vars_files:
     - vars.yml
+    - vars.local.yml  # Añadir credenciales
 
   tasks:
     - name: Ejecutar role common
@@ -14,7 +15,7 @@
       ansible.builtin.include_role:
         name: cimon-io.asdf
 
-    - name: Cambiar dueño del directorio .asdf (justo después del role asdf)
+    - name: Cambiar dueño del directorio .asdf
       ansible.builtin.file:
         path: /home/redmine/.asdf
         state: directory
@@ -26,7 +27,12 @@
       ansible.builtin.include_role:
         name: geerlingguy.mysql
 
-    - name: Descargar e instalar redmine
+    # Instalar OpenTelemetry Collector ANTES de Redmine
+    - name: Instalar OpenTelemetry Collector
+      ansible.builtin.include_role:
+        name: grafana.grafana.opentelemetry_collector
+
+    - name: Descargar e instalar redmine con instrumentación
       ansible.builtin.include_role:
         name: redmine
 

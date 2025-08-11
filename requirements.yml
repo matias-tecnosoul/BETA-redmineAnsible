@@ -3,3 +3,5 @@ roles:
   - name: cimon-io.asdf
   - name: geerlingguy.mysql
   - name: geerlingguy.nginx
+  - name: grafana.grafana.opentelemetry_collector
+    version: ">=0.1.0"

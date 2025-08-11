@@ -1,0 +1,39 @@
+require 'opentelemetry/sdk'
+require 'opentelemetry/exporter/otlp'
+require 'opentelemetry/instrumentation/all'
+
+# Cargar variables de entorno
+if File.exist?(File.expand_path('.env', Rails.root))
+  File.readlines(File.expand_path('.env', Rails.root)).each do |line|
+    next if line.strip.empty? || line.start_with?('#')
+    key, value = line.strip.split('=', 2)
+    ENV[key] = value if key && value
+  end
+end
+
+OpenTelemetry::SDK.configure do |c|
+  c.service_name = ENV['OTEL_SERVICE_NAME'] || '{{ redmine_otel_config.service_name }}'
+  c.service_version = ENV['OTEL_SERVICE_VERSION'] || '{{ redmine_otel_config.service_version }}'
+  
+  # Resource attributes
+  c.resource = OpenTelemetry::SDK::Resources::Resource.create({
+    'service.name' => ENV['OTEL_SERVICE_NAME'] || '{{ redmine_otel_config.service_name }}',
+    'service.version' => ENV['OTEL_SERVICE_VERSION'] || '{{ redmine_otel_config.service_version }}',
+    'service.environment' => Rails.env,
+    'service.instance.id' => ENV['HOSTNAME'] || Socket.gethostname,
+    'deployment.environment' => Rails.env,
+    'host.name' => '{{ ansible_hostname }}'
+  })
+
+  # Configurar exporter al collector local
+  c.add_span_processor(
+    OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
+      OpenTelemetry::Exporter::OTLP::Exporter.new(
+        endpoint: ENV['OTEL_EXPORTER_OTLP_ENDPOINT'] || '{{ redmine_otel_config.collector_endpoint }}'
+      )
+    )
+  )
+
+  # Instrumentar automáticamente
+  c.use_all()
+end

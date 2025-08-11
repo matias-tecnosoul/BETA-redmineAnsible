@@ -37,6 +37,94 @@ asdf_plugins:
     global: "3.2.0"
 asdf_legacy_version_file: "yes"
 
+# OpenTelemetry Collector Configuration
+opentelemetry_collector_config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    
+    # Métricas del host (opcional pero recomendado)
+    hostmetrics:
+      collection_interval: 30s
+      scrapers:
+        cpu:
+        disk:
+        memory:
+        network:
+        process:
+
+  processors:
+    batch:
+      timeout: 10s
+      send_batch_size: 1024
+    
+    # Detectar información del host
+    resourcedetection:
+      detectors: [env, system]
+      timeout: 5s
+    
+    # Enriquecer con información del servicio
+    resource:
+      attributes:
+        - key: deployment.environment
+          value: "{{ ansible_hostname }}"
+          action: upsert
+        - key: host.name
+          value: "{{ ansible_hostname }}"
+          action: upsert
+
+  exporters:
+    # Exporter principal a Grafana Cloud
+    otlphttp:
+      endpoint: "{{ grafana_cloud_otlp_endpoint }}"
+      headers:
+        Authorization: "Basic {{ grafana_cloud_otlp_token }}"
+    
+    # Exporter para debugging local (opcional)
+    logging:
+      loglevel: debug
+
+  extensions:
+    health_check:
+      endpoint: 0.0.0.0:13133
+    pprof:
+      endpoint: 0.0.0.0:1777
+    zpages:
+      endpoint: 0.0.0.0:55679
+
+  service:
+    extensions: [health_check, pprof, zpages]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [resourcedetection, resource, batch]
+        exporters: [otlphttp]
+      
+      metrics:
+        receivers: [otlp, hostmetrics]
+        processors: [resourcedetection, resource, batch]
+        exporters: [otlphttp]
+      
+      logs:
+        receivers: [otlp]
+        processors: [resourcedetection, resource, batch]
+        exporters: [otlphttp]
+
+# Configuración específica de Grafana Cloud
+# NOTA: Crear vars.local.yml para estos valores sensibles
+grafana_cloud_otlp_endpoint: "{{ vault_grafana_cloud_otlp_endpoint }}"
+grafana_cloud_otlp_token: "{{ vault_grafana_cloud_otlp_token }}"
+
+# Configuración de OpenTelemetry para Redmine
+redmine_otel_config:
+  service_name: "redmine"
+  service_version: "{{ redmine_version }}"
+  collector_endpoint: "http://127.0.0.1:4318"  # HTTP endpoint del collector local
+
 # geerlingguy.nginx
 
 nginx_remove_default_vhost: true
@@ -47,14 +135,37 @@ nginx_vhosts:
     root: "/opt/redmine/public"
     index: "index.html index.htm"
     extra_parameters: |
+      # Logs estructurados para observabilidad
+      log_format json_combined escape=json
+      '{'
+          '"time":"$time_iso8601",'
+          '"remote_addr":"$remote_addr",'
+          '"request":"$request",'
+          '"status":$status,'
+          '"body_bytes_sent":$body_bytes_sent,'
+          '"request_time":$request_time,'
+          '"upstream_response_time":"$upstream_response_time",'
+          '"http_user_agent":"$http_user_agent",'
+          '"trace_id":"$http_x_trace_id"'
+      '}';
+      
+      access_log /var/log/nginx/redmine_access.log json_combined;
+      
       location /assets/ {
           expires max;
           access_log off;
+          add_header X-Trace-Id $http_x_trace_id always;
       }
+      
       location / {
           proxy_pass http://localhost:3001;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto $scheme;
+          
+          # Preservar headers de tracing
+          proxy_set_header X-Trace-Id $http_x_trace_id;
+          proxy_set_header traceparent $http_traceparent;
+          proxy_set_header tracestate $http_tracestate;
       }
