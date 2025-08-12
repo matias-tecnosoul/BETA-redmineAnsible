@@ -1,0 +1,59 @@
+version: '3.8'
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-docker
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=true
+      # ✨ Habilitar exemplars en Grafana
+      - GF_FEATURE_TOGGLES_ENABLE=traceToMetrics
+    networks:
+      - observability
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-storage:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      # ✨ Habilitar remote write receiver
+      - '--web.enable-remote-write-receiver'
+      - '--enable-feature=exemplar-storage'
+    networks:
+      - observability
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo-docker
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+      # ✨ Volúmenes para metrics generator
+      - tempo-storage:/var/tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    networks:
+      - observability
+
+networks:
+  observability:
+    driver: bridge
+
+# ✨ VOLÚMENES PARA PERSISTENCIA - NUEVO
+volumes:
+  grafana-storage:
+  prometheus-storage:
+  tempo-storage:

@@ -1,0 +1,198 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Redmine RED Metrics",
+    "tags": ["redmine", "opentelemetry", "red"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate (Requests/sec)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(tempo_span_metrics_calls_total{service_name=\"redmine\"}[5m])",
+            "legendFormat": "{{http_method}} {{http_target}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Error Rate (%)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(tempo_span_metrics_calls_total{service_name=\"redmine\",http_status_code!~\"2..\"}[5m]) / rate(tempo_span_metrics_calls_total{service_name=\"redmine\"}[5m]) * 100",
+            "legendFormat": "Error Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Response Duration (P95)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(tempo_span_metrics_duration_bucket{service_name=\"redmine\"}[5m]))",
+            "legendFormat": "P95 Duration",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 0.5}
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "Request Rate Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(tempo_span_metrics_calls_total{service_name=\"redmine\"}[5m])",
+            "legendFormat": "{{http_method}} {{http_target}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "pointSize": 5,
+              "showPoints": "always"
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "title": "Response Duration Histogram with Exemplars",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(tempo_span_metrics_duration_bucket{service_name=\"redmine\"}[5m]))",
+            "legendFormat": "P95",
+            "refId": "A",
+            "exemplar": true
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(tempo_span_metrics_duration_bucket{service_name=\"redmine\"}[5m]))",
+            "legendFormat": "P50",
+            "refId": "B",
+            "exemplar": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "pointSize": 5,
+              "showPoints": "always"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 6,
+        "title": "Service Graph",
+        "type": "nodeGraph",
+        "targets": [
+          {
+            "expr": "tempo_service_graph_request_total",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        }
+      }
+    ]
+  }
+}
